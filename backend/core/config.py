@@ -22,6 +22,9 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "https://yapwise-ai.vercel.app",
+        "https://yapwise.vercel.app",
+        "https://yapwise-ai-7.onrender.com",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

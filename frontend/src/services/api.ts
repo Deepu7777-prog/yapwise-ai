@@ -13,15 +13,17 @@ import {
 } from '../types';
 
 const getApiBase = (): string => {
-  let envBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  let envBase = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').trim();
   if (!envBase) {
     return '/api/v1';
   }
   // Strip trailing slash
   envBase = envBase.replace(/\/+$/, '');
   // Append /api/v1 if missing
-  if (!envBase.endsWith('/api/v1')) {
+  if (!envBase.endsWith('/api/v1') && !envBase.endsWith('/api')) {
     envBase = `${envBase}/api/v1`;
+  } else if (envBase.endsWith('/api')) {
+    envBase = `${envBase}/v1`;
   }
   return envBase;
 };

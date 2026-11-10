@@ -25,8 +25,15 @@ import {
   SpeakingMode,
 } from './types';
 
-const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
-const BASE_URL = rawApiUrl ? `${rawApiUrl}/api` : '/api';
+const rawApiUrl = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  ''
+).trim().replace(/\/+$/, '');
+
+const BASE_URL = rawApiUrl
+  ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`)
+  : '/api';
 
 export class ApiError extends Error {
   status: number;
@@ -104,6 +111,11 @@ async function request<T>(
     }
 
     let detailMessage = `Request failed with status ${response.status}`;
+    if (response.status === 405) {
+      detailMessage = 'Unable to reach backend API (Method Not Allowed). The server proxy is updating, please try again.';
+    } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+      detailMessage = 'The backend server is waking up from sleep. Please wait a few seconds and try again.';
+    }
     let errorCode: string | undefined;
 
     try {

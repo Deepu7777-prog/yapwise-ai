@@ -402,10 +402,11 @@ export const Auth: React.FC<AuthProps> = ({ initialTab = 'login' }) => {
                         <input
                           id="login-email"
                           type="email"
-                          placeholder="you@example.com"
+                          placeholder="you@college.edu"
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
                           required
+                          autoComplete="email"
                           className="w-full pl-10 pr-3 h-10 rounded-xl bg-[#F8F6FF] border border-[#D4C7F5] text-xs font-medium text-[#302B42] placeholder:text-[#77718B] focus:outline-none focus:ring-2 focus:ring-[#7652C8]"
                         />
                       </div>
@@ -426,6 +427,7 @@ export const Auth: React.FC<AuthProps> = ({ initialTab = 'login' }) => {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           required
+                          autoComplete="current-password"
                           className="w-full pl-10 pr-10 h-10 rounded-xl bg-[#F8F6FF] border border-[#D4C7F5] text-xs font-medium text-[#302B42] placeholder:text-[#77718B] focus:outline-none focus:ring-2 focus:ring-[#7652C8]"
                         />
                         <button
@@ -519,6 +521,7 @@ export const Auth: React.FC<AuthProps> = ({ initialTab = 'login' }) => {
                           value={registerEmail}
                           onChange={(e) => setRegisterEmail(e.target.value)}
                           required
+                          autoComplete="email"
                           className="w-full pl-10 pr-3 h-10 rounded-xl bg-[#F8F6FF] border border-[#D4C7F5] text-xs font-medium text-[#302B42] placeholder:text-[#77718B] focus:outline-none focus:ring-2 focus:ring-[#7652C8]"
                         />
                       </div>
@@ -539,6 +542,7 @@ export const Auth: React.FC<AuthProps> = ({ initialTab = 'login' }) => {
                           value={registerPassword}
                           onChange={(e) => setRegisterPassword(e.target.value)}
                           required
+                          autoComplete="new-password"
                           className="w-full pl-10 pr-10 h-10 rounded-xl bg-[#F8F6FF] border border-[#D4C7F5] text-xs font-medium text-[#302B42] placeholder:text-[#77718B] focus:outline-none focus:ring-2 focus:ring-[#7652C8]"
                         />
                         <button

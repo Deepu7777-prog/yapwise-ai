@@ -7,11 +7,17 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
-    // Allow Cloudflare Tunnel external hostnames
-    allowedHosts: ['.trycloudflare.com', 'localhost', '127.0.0.1'],
+    allowedHosts: [
+      'yapwise-ai-7.onrender.com',
+      '.onrender.com',
+      '.vercel.app',
+      '.trycloudflare.com',
+      'localhost',
+      '127.0.0.1',
+    ],
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://yapwise-ai.onrender.com' : 'http://localhost:8000'),
         changeOrigin: true,
       },
     },
@@ -20,10 +26,17 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
-    allowedHosts: ['.trycloudflare.com', 'localhost', '127.0.0.1'],
+    allowedHosts: [
+      'yapwise-ai-7.onrender.com',
+      '.onrender.com',
+      '.vercel.app',
+      '.trycloudflare.com',
+      'localhost',
+      '127.0.0.1',
+    ],
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://yapwise-ai.onrender.com' : 'http://localhost:8000'),
         changeOrigin: true,
       },
     },

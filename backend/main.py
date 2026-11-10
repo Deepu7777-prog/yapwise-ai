@@ -1,5 +1,6 @@
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 from backend.core.database import Base, engine
@@ -37,6 +38,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com|.*\.trycloudflare\.com)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,6 +57,15 @@ app.include_router(reminders_router, prefix=settings.API_V1_STR)
 # Section 5 router mounted at both /api and /api/v1 for unified compatibility
 app.include_router(section5_router, prefix="/api")
 app.include_router(section5_router, prefix=settings.API_V1_STR)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error on {request.method} {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server error: {str(exc)}", "type": type(exc).__name__}
+    )
 
 
 @app.get("/api/health", tags=["Health"])
