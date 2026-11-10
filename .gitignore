@@ -1,0 +1,53 @@
+# Environment variables (NEVER COMMIT SECRETS)
+.env
+.env.local
+.env.*.local
+*.env
+backend/.env
+frontend/.env
+!*.env.example
+
+# Python virtual environment & caches
+venv/
+backend/venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node & Frontend dependencies & builds
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+build/
+.npm
+.eslintcache
+
+# Databases & local persistent storage
+*.db
+*.sqlite
+*.sqlite3
+yapwise.db
+backend/yapwise.db
+
+# OS & Editor generated files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs & temporary run scripts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+cloudflared*
