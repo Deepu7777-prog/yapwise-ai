@@ -17,7 +17,7 @@ export default defineConfig({
     ],
     proxy: {
       '/api': {
-        target: process.env.VITE_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://yapwise-ai.onrender.com' : 'http://localhost:8000'),
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
     },
@@ -36,7 +36,7 @@ export default defineConfig({
     ],
     proxy: {
       '/api': {
-        target: process.env.VITE_BACKEND_URL || (process.env.NODE_ENV === 'production' ? 'https://yapwise-ai.onrender.com' : 'http://localhost:8000'),
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
     },
