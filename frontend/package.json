@@ -10,7 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@react-three/fiber": "^9.8.2",
+    "@react-three/fiber": "^8.18.0",
     "@types/three": "^0.187.0",
     "clsx": "^2.1.1",
     "framer-motion": "^14.11.1",
