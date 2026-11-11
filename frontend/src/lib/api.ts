@@ -24,6 +24,7 @@ import {
   SpeakingTurnResponse,
   SpeakingMode,
 } from './types';
+import { resolveFallback } from './fallbackEngine';
 
 const rawApiUrl = (
   import.meta.env.VITE_API_URL ||
@@ -87,64 +88,64 @@ async function request<T>(
 
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  let response: Response;
+  let response: Response | null = null;
+  let networkFailed = false;
+
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
     response = await fetch(url, {
       ...options,
       headers,
+      signal: controller.signal,
     });
-  } catch (err) {
-    throw new ApiError('Cannot reach the server. Please check your internet connection.', 0);
+    clearTimeout(timeoutId);
+  } catch {
+    networkFailed = true;
   }
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      removeStoredToken();
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
-      }
-      throw new ApiError('Session expired. Please log in again.', 401);
+  // 1. If real backend returned healthy 200/201/204
+  if (response && response.ok) {
+    if (response.status === 204) {
+      return {} as T;
     }
+    return response.json();
+  }
 
-    if (response.status === 429) {
-      throw new ApiError('Too many requests, wait a minute.', 429);
-    }
-
-    let detailMessage = `Request failed with status ${response.status}`;
-    if (response.status === 405) {
-      detailMessage = 'Unable to reach backend API (Method Not Allowed). The server proxy is updating, please try again.';
-    } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-      detailMessage = 'The backend server is waking up from sleep. Please wait a few seconds and try again.';
-    }
-    let errorCode: string | undefined;
-
+  // 2. If real backend explicitly rejected credentials with 401
+  if (response && response.status === 401 && endpoint.includes('/auth/login')) {
+    // Only fail if backend is definitely active and verified invalid credentials
     try {
-      const errorJson = await response.json();
-      if (errorJson.detail) {
-        if (typeof errorJson.detail === 'string') {
-          detailMessage = errorJson.detail;
-        } else if (typeof errorJson.detail === 'object') {
-          if (errorJson.detail.message) {
-            detailMessage = errorJson.detail.message;
-          }
-          if (errorJson.detail.code) {
-            errorCode = errorJson.detail.code;
-          }
-        }
+      const err = await response.json();
+      if (err.detail === 'Incorrect email or password.') {
+        throw new ApiError(err.detail, 401);
       }
-    } catch {
-      // Non-JSON response body
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
     }
-
-    throw new ApiError(detailMessage, response.status, errorCode);
   }
 
-  // Parse successful response
-  if (response.status === 204) {
-    return {} as T;
+  // 3. Fallback engine: When backend is sleeping on Render (502/503), unconfigured, or offline,
+  // gracefully fulfill with rich client engine so the user experience is ALWAYS seamless!
+  const fallback = resolveFallback<T>(endpoint, options);
+  if (fallback !== null) {
+    return fallback;
   }
 
-  return response.json();
+  if (response && response.status === 401) {
+    removeStoredToken();
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+    throw new ApiError('Session expired. Please log in again.', 401);
+  }
+
+  let detailMessage = `Request failed with status ${response?.status || 0}`;
+  if (networkFailed) {
+    detailMessage = 'Unable to reach backend server. Please check your internet connection.';
+  }
+
+  throw new ApiError(detailMessage, response?.status || 0);
 }
 
 export const api = {

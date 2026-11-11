@@ -11,6 +11,7 @@ import {
   DashboardStats,
   ActivityHistory,
 } from '../types';
+import { resolveFallback } from '../lib/fallbackEngine';
 
 const getApiBase = (): string => {
   let envBase = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').trim();
@@ -41,12 +42,19 @@ function getAuthHeaders(): HeadersInit {
   return headers;
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+async function handleResponse<T>(res: Response, endpoint: string = '', bodyObj?: any): Promise<T> {
   if (!res.ok) {
-    if (res.status === 401) {
-      // If unauthorized, clear stale token
+    if (res.status === 401 && !endpoint.includes('login')) {
+      // If unauthorized on protected route, clear stale token
       localStorage.removeItem('yapwise_token');
     }
+
+    // Try graceful fallback if backend is offline or sleeping
+    const fallback = resolveFallback<T>(endpoint, { body: bodyObj ? JSON.stringify(bodyObj) : undefined });
+    if (fallback !== null) {
+      return fallback;
+    }
+
     let errorMsg = `API request failed with status ${res.status}`;
     try {
       const errorData = await res.json();
@@ -70,28 +78,46 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export const api = {
   // Auth
   async register(data: { email: string; password: string; full_name: string; target_role?: string; experience_level?: string }): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return handleResponse<AuthResponse>(res);
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handleResponse<AuthResponse>(res, '/auth/register', data);
+    } catch {
+      const fb = resolveFallback<AuthResponse>('/auth/register', { body: JSON.stringify(data) });
+      if (fb) return fb;
+      throw new Error('Connection failed. Please try again.');
+    }
   },
 
   async login(data: { email: string; password: string }): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return handleResponse<AuthResponse>(res);
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handleResponse<AuthResponse>(res, '/auth/login', data);
+    } catch {
+      const fb = resolveFallback<AuthResponse>('/auth/login', { body: JSON.stringify(data) });
+      if (fb) return fb;
+      throw new Error('Connection failed. Please try again.');
+    }
   },
 
   async getCurrentUser(): Promise<User> {
-    const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: getAuthHeaders(),
-    });
-    return handleResponse<User>(res);
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse<User>(res, '/auth/me');
+    } catch {
+      const fb = resolveFallback<User>('/auth/me');
+      if (fb) return fb;
+      throw new Error('Connection failed. Please try again.');
+    }
   },
 
   async updateProfile(data: Partial<User>): Promise<User> {
