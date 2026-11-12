@@ -36,13 +36,37 @@ export const CHARACTER_VOICE_CONFIGS: Record<'kid' | 'english_coach' | 'intervie
   },
   interview_coach: {
     characterId: 'interview_coach',
-    name: 'Interview Coach (Executive & Confident Male)',
-    pitch: 0.88, // Distinctly deeper, resonant pitch for professional male coach
-    rate: 0.95,
-    targetVoiceKeywords: ['david', 'guy', 'ravi', 'alex', 'male', 'mark', 'daniel', 'george', 'google uk english male'],
-    sampleText: "Good day! I am your Placement and Technical Interview Coach. Let's practice structured, high-impact responses.",
+    name: 'AI Senior Placement Mentor (Warm & Articulate Female)',
+    pitch: 1.08, // Natural, clear female pitch
+    rate: 0.98,
+    targetVoiceKeywords: ['heera', 'neerja', 'zira', 'jenny', 'samantha', 'aria', 'female', 'karen', 'victoria', 'google uk english female', 'google us english'],
+    sampleText: "Hello! I am your AI Mentor at YapWise AI. Let's practice structured, high-impact placement interview responses.",
   },
 };
+
+export function getFemaleMentorVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (!voices || voices.length === 0) return null;
+  const femaleKeywords = [
+    'heera', 'neerja', 'zira', 'jenny', 'samantha', 'aria', 'female', 'karen', 'victoria',
+    'priya', 'swara', 'veena', 'google uk english female', 'google us english'
+  ];
+  const maleKeywords = ['david', 'ravi', 'guy', 'mark', 'george', 'male', 'richard', 'james'];
+
+  for (const kw of femaleKeywords) {
+    const matched = voices.find((v) => {
+      const name = v.name.toLowerCase();
+      return name.includes(kw) && !maleKeywords.some((m) => name.includes(m));
+    });
+    if (matched) return matched;
+  }
+
+  // Fallback to any voice without male keyword
+  const nonMale = voices.find((v) => {
+    const name = v.name.toLowerCase();
+    return !maleKeywords.some((m) => name.includes(m));
+  });
+  return nonMale || voices[0] || null;
+}
 
 export function useSpeechSynthesis() {
   const [supported, setSupported] = useState<boolean>(false);
@@ -112,26 +136,8 @@ export function useSpeechSynthesis() {
         if (found) return found;
       }
 
-      // 3. Fallbacks: male for interview coach, female for english coach/kid
-      if (characterId === 'interview_coach') {
-        const male = voices.find(
-          (v) =>
-            v.name.toLowerCase().includes('male') ||
-            v.name.toLowerCase().includes('david') ||
-            v.name.toLowerCase().includes('guy')
-        );
-        if (male) return male;
-      } else {
-        const female = voices.find(
-          (v) =>
-            v.name.toLowerCase().includes('female') ||
-            v.name.toLowerCase().includes('zira') ||
-            v.name.toLowerCase().includes('jenny')
-        );
-        if (female) return female;
-      }
-
-      return voices[0] || null;
+      // 3. Fallbacks: Always use female voice for interview coach and english coach/kid
+      return getFemaleMentorVoice(voices) || voices[0] || null;
     },
     [voices]
   );

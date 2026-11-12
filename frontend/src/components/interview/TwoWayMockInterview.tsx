@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { PhotoRealisticMentorAvatar, MentorState } from '../avatar/PhotoRealisticMentorAvatar';
 import { LipSyncController, MouthMorphTarget, VISEME_TARGETS } from '../../lib/lipSyncEngine';
-import { useSpeechSynthesis } from '../../hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, getFemaleMentorVoice } from '../../hooks/useSpeechSynthesis';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
@@ -151,6 +151,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
 
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
+  const [isCallStarted, setIsCallStarted] = useState(false);
 
   // 4. Interactive Help Assistant & History State
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -272,7 +273,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
   }, [isSpeaking, mentorState, resetTranscript, startListening]);
 
   /**
-   * Speak Interviewer Question with Synchronized Audio-Driven Lip Movements
+   * Speak Interviewer Question with Synchronized Audio-Driven Lip Movements & 100% Female Voice
    */
   const askQuestionAloud = useCallback(
     (questionText: string) => {
@@ -281,22 +282,27 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
       setMentorState('speaking');
       lipSyncControllerRef.current.setSpeaking(true, questionText.split(' ')[0]);
 
-      let targetVoice = null;
-      if (voices.length > 0) {
-        targetVoice =
-          voices.find(
-            (v) =>
-              (v.lang.includes('en-IN') || v.lang.includes('en-US')) &&
-              v.name.toLowerCase().includes('female')
-          ) ||
-          voices.find((v) => v.name.toLowerCase().includes('female')) ||
-          voices[0];
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.resume();
+        } catch {}
       }
 
+      // Always resolve verified articulate female voice
+      const targetVoice = getFemaleMentorVoice(voices);
+
       const utterance = new SpeechSynthesisUtterance(questionText);
-      utterance.pitch = 1.05; // Friendly, clear pitch for female mentor
-      utterance.rate = 0.98; // Natural, articulate conversational speed
-      if (targetVoice) utterance.voice = targetVoice;
+      utterance.pitch = 1.15; // Unmistakably bright, warm, articulate female pitch
+      utterance.rate = 0.98; // Natural, conversational speed
+      if (targetVoice) {
+        utterance.voice = targetVoice;
+      }
+
+      utterance.onstart = () => {
+        setMentorState('speaking');
+        lipSyncControllerRef.current.setSpeaking(true);
+      };
 
       utterance.onboundary = (e) => {
         if (e.name === 'word') {
@@ -312,7 +318,10 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         startListening();
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        if (e.error !== 'canceled') {
+          console.warn('SpeechSynthesis warning:', e);
+        }
         lipSyncControllerRef.current.setSpeaking(false);
         setMentorState('listening');
         startListening();
@@ -329,14 +338,10 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
     [cancelSpeech, stopListening, voices, resetTranscript, startListening]
   );
 
-  // Ask first question when component mounts
-  useEffect(() => {
-    const greetingText = `Good day! I'm your AI Mentor at YapWise AI. Welcome to your ${companyTarget} placement interview. Let's begin with question one: ${questions[0].question}`;
-    const timer = setTimeout(() => {
-      askQuestionAloud(greetingText);
-    }, 700);
-
-    return () => clearTimeout(timer);
+  const startInterviewCall = useCallback(() => {
+    setIsCallStarted(true);
+    const greetingText = `Good day! I'm your AI Mentor Aaradhya at YapWise AI. Welcome to your ${companyTarget} placement interview. Let's begin with question one: ${questions[0].question}`;
+    askQuestionAloud(greetingText);
   }, [companyTarget, questions, askQuestionAloud]);
 
   /**
@@ -374,9 +379,9 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
       setEvaluations((prev) => [...prev, result]);
       setCurrentFeedback(result);
 
-      // Mentor speaks feedback aloud
+      // Mentor speaks feedback aloud using female voice and lip-reading motion
       const feedbackSpeech = `Well articulated. ${result.feedback}`;
-      speak(feedbackSpeech);
+      askQuestionAloud(feedbackSpeech);
     } catch {
       const fallbackResult = {
         question: currentQuestion.question,
@@ -497,6 +502,52 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         className
       )}
     >
+      {/* ------------------------------------------------------------- */}
+      {/* 0. START INTERVIEW CALL / AUDIO UNLOCK OVERLAY                 */}
+      {/* ------------------------------------------------------------- */}
+      {!isCallStarted && (
+        <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1C1630] border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-5 shadow-2xl text-white"
+          >
+            <div className="relative w-28 h-28 mx-auto rounded-3xl overflow-hidden border-2 border-purple-400 shadow-2xl shadow-purple-600/30">
+              <img
+                src="/ai_mentor.jpg"
+                alt="AI Mentor Aaradhya"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-0 inset-x-0 bg-purple-600/90 text-[10px] font-black text-white py-0.5 tracking-wider">
+                AI MENTOR
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-heading font-black text-xl text-white">
+                Ready for Your Mock Interview?
+              </h3>
+              <p className="text-xs text-white/75 leading-relaxed">
+                Your AI Placement Mentor <span className="text-purple-300 font-bold">Aaradhya</span> is waiting in the studio for your <span className="text-white font-semibold">{companyTarget}</span> interview.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={startInterviewCall}
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-heading font-black text-sm shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2.5 transition-all cursor-pointer transform hover:scale-[1.02]"
+            >
+              <Volume2 className="w-5 h-5 animate-pulse" />
+              <span>Join Interview & Speak Aloud</span>
+            </button>
+
+            <p className="text-[11px] text-white/50">
+              Starts real-time female AI voice, mouth movement & microphone
+            </p>
+          </motion.div>
+        </div>
+      )}
+
       {/* ------------------------------------------------------------- */}
       {/* 1. TOP VIDEO CALL CONTROL BAR (Zoom / Teams Style) */}
       {/* ------------------------------------------------------------- */}
@@ -678,15 +729,28 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
               <Sparkles className="w-3.5 h-3.5" /> Question {currentQuestion.questionNumber} of {questions.length}
             </span>
 
-            {/* Direct AI Mentor Help Button */}
-            <button
-              type="button"
-              onClick={handleAskMentorHelp}
-              className="text-[11px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/20 transition-colors cursor-pointer"
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              <span>Ask Mentor for Help</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Speak Question Aloud Button */}
+              <button
+                type="button"
+                onClick={() => askQuestionAloud(currentQuestion.question)}
+                className="text-[11px] font-bold text-purple-200 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 transition-colors cursor-pointer"
+                title="Hear mentor speak aloud"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-purple-300" />
+                <span>Hear Mentor Speak</span>
+              </button>
+
+              {/* Direct AI Mentor Help Button */}
+              <button
+                type="button"
+                onClick={handleAskMentorHelp}
+                className="text-[11px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/20 transition-colors cursor-pointer"
+              >
+                <Lightbulb className="w-3.5 h-3.5" />
+                <span>Ask Mentor for Help</span>
+              </button>
+            </div>
           </div>
 
           <p className="font-heading font-black text-sm sm:text-base text-white leading-snug">
