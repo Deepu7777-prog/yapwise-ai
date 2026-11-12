@@ -1294,5 +1294,61 @@ Return ONLY valid JSON.
 
         return opportunities
 
+    def get_career_help(self, question: str, context: Optional[str] = None) -> Dict[str, Any]:
+        """Provides student career mentorship, interview coaching, and resume guidance."""
+        if not self.configured:
+            return {
+                "answer": f"Here is practical advice for '{question}': Focus on concrete metrics, structure your answer using the STAR method, and align your skills directly with job requirements.",
+                "actionable_tips": [
+                    "Quantify your accomplishments (e.g. 'reduced latency by 25%')",
+                    "Tailor technical keywords to the job description",
+                    "Practice delivering your answer in 60-90 seconds aloud"
+                ],
+                "suggested_followups": [
+                    "How do I structure my project answer with STAR?",
+                    "What questions will HR ask about gaps?",
+                    "How should I negotiate my first internship offer?"
+                ]
+            }
+
+        prompt = f"""You are the friendly, expert AI Mentor and Placement Coach at YapWise AI.
+A college student is asking for your direct help:
+Question: {question}
+Context/Resume/Role: {context or 'General Campus Placement'}
+
+Provide a warm, highly encouraging, and actionable response that helps the student succeed.
+Format response as strict JSON:
+{{
+  "answer": "Clear, encouraging explanation and step-by-step guidance",
+  "actionable_tips": ["Tip 1", "Tip 2", "Tip 3"],
+  "suggested_followups": ["Followup question 1", "Followup question 2"]
+}}
+"""
+        try:
+            response = self.model.generate_content(prompt)
+            clean_text = response.text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            return json.loads(clean_text.strip())
+        except Exception as e:
+            logger.warning(f"Gemini help error: {e}")
+            return {
+                "answer": f"Focus on concrete impact and structure. For '{question}': emphasize what unique technical decisions you made and what measurable value you achieved.",
+                "actionable_tips": [
+                    "Use active action verbs: Engineered, Optimized, Architected",
+                    "Keep answers concise and structured using the STAR framework",
+                    "Highlight teamwork, technical ownership, and problem-solving tenacity"
+                ],
+                "suggested_followups": [
+                    "Can you rewrite my project summary with metrics?",
+                    "What are common trap questions in tech rounds?"
+                ]
+            }
+
+
 
 gemini_service = GeminiService()

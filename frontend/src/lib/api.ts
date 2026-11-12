@@ -82,6 +82,10 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   };
 
+  if (options.body instanceof FormData) {
+    delete headers['Content-Type'];
+  }
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -360,6 +364,15 @@ export const api = {
       }),
     getCodingGuidance: () => request<CodingGuidance>('/career/coding-guidance'),
     getInterviewGuidance: () => request<InterviewGuidance>('/career/interview-guidance'),
+    help: (question: string, context?: string) =>
+      request<{
+        answer: string;
+        actionable_tips: string[];
+        suggested_followups: string[];
+      }>('/career/help', {
+        method: 'POST',
+        body: JSON.stringify({ question, context }),
+      }),
   },
 
   // 12. Speaking Companion (Page Two)
@@ -438,5 +451,17 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ resume_text, target_role }),
       }),
+    upload: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return request<{
+        filename: string;
+        text: string;
+        char_count: number;
+      }>('/resume/upload', {
+        method: 'POST',
+        body: formData,
+      });
+    },
   },
 };

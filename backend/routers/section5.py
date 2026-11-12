@@ -1,8 +1,9 @@
+import io
 import datetime
 import json
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -1236,3 +1237,60 @@ def scan_resume_endpoint(
         target_role=role
     )
     return result
+
+@router.post("/resume/upload")
+async def upload_resume_document(
+    file: UploadFile = File(...)
+):
+    """Extract text from uploaded PDF, DOCX, or text document."""
+    filename = file.filename or "resume.txt"
+    content = await file.read()
+    extracted_text = ""
+
+    ext = filename.lower().split(".")[-1]
+    if ext == "pdf":
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(content))
+            pages_text = [page.extract_text() or "" for page in reader.pages]
+            extracted_text = "\n".join(pages_text).strip()
+        except Exception as e:
+            logger.warning(f"pypdf extraction failed: {e}")
+            extracted_text = content.decode("utf-8", errors="ignore")
+    elif ext in ["docx", "doc"]:
+        try:
+            import docx
+            doc = docx.Document(io.BytesIO(content))
+            extracted_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+        except Exception as e:
+            logger.warning(f"docx extraction failed: {e}")
+            extracted_text = content.decode("utf-8", errors="ignore")
+    else:
+        extracted_text = content.decode("utf-8", errors="ignore")
+
+    if not extracted_text.strip():
+        extracted_text = "Could not extract legible text. Please ensure the document contains selectable text and is not an image scan."
+
+    return {
+        "filename": filename,
+        "text": extracted_text,
+        "char_count": len(extracted_text)
+    }
+
+# ==========================================
+# 15. AI CAREER COPILOT / HELP ASSISTANT
+# ==========================================
+class CareerHelpPayload(BaseModel):
+    question: str
+    context: Optional[str] = None
+
+@router.post("/career/help")
+def career_help_endpoint(
+    payload: CareerHelpPayload,
+    user: User = Depends(get_current_user)
+):
+    return gemini_service.get_career_help(
+        question=payload.question,
+        context=payload.context
+    )
+
