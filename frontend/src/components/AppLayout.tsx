@@ -136,6 +136,7 @@ export function AppLayout() {
     {
       title: 'AI PRACTICE',
       items: [
+        { label: 'AI Talking Avatar', icon: Sparkles, path: '/avatar' },
         { label: 'Speak with AI', icon: Mic, path: '/speaking' },
         { label: 'My Progress', icon: BarChart3, path: '/session-report' },
       ],

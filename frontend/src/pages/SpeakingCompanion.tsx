@@ -11,6 +11,8 @@ import { Dialog } from '../components/ui/Dialog';
 import { ScoreRing } from '../components/ScoreRing';
 import { cn } from '../lib/utils';
 import { ExpressiveCharacterAvatar } from '../components/3d/ExpressiveCharacterAvatar';
+import { TalkingAvatarArena } from '../components/avatar/TalkingAvatarArena';
+import { REALISTIC_AVATARS } from '../lib/avatars';
 import {
   Mic,
   MicOff,
@@ -143,6 +145,7 @@ export const SpeakingCompanion: React.FC<SpeakingCompanionProps> = ({ initialSta
   const [stage, setStage] = useState<SpeakingStage>(initialStage);
   const [selectedPartner, setSelectedPartner] = useState<PartnerInfo>(PARTNERS[1]);
   const [mode, setMode] = useState<SpeakingMode>('free');
+  const [viewMode, setViewMode] = useState<'avatar' | 'split'>('avatar');
 
   useEffect(() => {
     if (initialStage) {
@@ -427,6 +430,40 @@ export const SpeakingCompanion: React.FC<SpeakingCompanionProps> = ({ initialSta
             </p>
           </div>
 
+          {/* NEW FEATURE HIGHLIGHT: REALISTIC AI TALKING AVATAR HERO BANNER */}
+          <div className="relative overflow-hidden rounded-3xl p-6 bg-gradient-to-r from-[#7652C8] via-[#855FD8] to-[#9973E8] text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="space-y-2 max-w-xl text-center md:text-left z-10">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-black text-amber-300">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>NEW FEATURE UPGRADE</span>
+              </div>
+              <h2 className="font-heading font-black text-2xl sm:text-3xl text-white tracking-tight">
+                Realistic AI Talking Avatars with Real-Time Lip Sync
+              </h2>
+              <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
+                Meet realistic male & female conversational mentors. See accurate mouth movements synchronized to spoken speech, natural blinking, and responsive facial expressions.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 z-10 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('avatar');
+                  setStage('room');
+                }}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white text-[#7652C8] font-heading font-black text-sm shadow-lg hover:bg-[#FAF7FF] hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Launch Talking Avatar Arena</span>
+              </button>
+            </div>
+
+            {/* Subtle Background Glow Spheres */}
+            <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+            <div className="absolute -left-12 -top-12 w-64 h-64 rounded-full bg-black/10 blur-2xl pointer-events-none" />
+          </div>
+
           {/* 3 Partner Cards Grid with Framer Motion */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             {PARTNERS.map((partner, index) => {
@@ -611,27 +648,38 @@ export const SpeakingCompanion: React.FC<SpeakingCompanionProps> = ({ initialSta
               </div>
             </div>
 
-            {/* Center: Voice Selector Dropdown */}
-            {voices.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-[#77718B] hidden md:inline">Voice:</span>
-                <select
-                  value={selectedVoice?.name || ''}
-                  onChange={(e) => {
-                    const match = voices.find((v) => v.name === e.target.value);
-                    if (match) setSelectedVoice(match);
-                  }}
-                  className="bg-[#F8F6FF] border border-[#EDE7FF] rounded-xl px-2.5 py-1 text-xs text-[#302B42] font-semibold focus:outline-none focus:ring-2 focus:ring-[#7652C8]"
-                >
-                  <option value="">Default Character Profile ({selectedPartner.name})</option>
-                  {voices.slice(0, 10).map((v) => (
-                    <option key={v.name} value={v.name}>
-                      {v.name} ({v.lang})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Center: Experience Mode Switcher (Talking Avatar vs Studio View) */}
+            <div className="flex items-center gap-1 p-1 bg-[#F8F6FF] rounded-xl border border-[#EDE7FF]">
+              <button
+                type="button"
+                onClick={() => setViewMode('avatar')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer',
+                  viewMode === 'avatar'
+                    ? 'bg-[#7652C8] text-white shadow-xs'
+                    : 'text-[#77718B] hover:text-[#302B42]'
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Talking Avatar</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-emerald-950 font-black">
+                  LIVE
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('split')}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer',
+                  viewMode === 'split'
+                    ? 'bg-[#7652C8] text-white shadow-xs'
+                    : 'text-[#77718B] hover:text-[#302B42]'
+                )}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Studio View</span>
+              </button>
+            </div>
 
             {/* Right: Timer & End Session Button */}
             <div className="flex items-center gap-3">
@@ -650,8 +698,22 @@ export const SpeakingCompanion: React.FC<SpeakingCompanionProps> = ({ initialSta
             </div>
           </div>
 
-          {/* MAIN SPEAKING ARENA (3 Columns) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* EXPERIENCE MODE DISPLAY */}
+          {viewMode === 'avatar' ? (
+            <TalkingAvatarArena
+              initialAvatarId={
+                selectedPartner.id === 'interview_coach'
+                  ? 'alex_vance'
+                  : selectedPartner.id === 'kid'
+                  ? 'maya_lin'
+                  : 'priya_sharma'
+              }
+              mode={mode}
+              onSessionEnd={() => setStage('celebration')}
+            />
+          ) : (
+            /* MAIN SPEAKING ARENA (3 Columns) */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             {/* 1. LEFT COLUMN: Expressive AI Character Avatar (4 Cols) */}
             <div className="lg:col-span-4 space-y-4">
               <div className="rounded-3xl border-2 border-[#EDE7FF] bg-gradient-to-b from-white via-white to-[#EDE7FF]/40 p-4 shadow-card flex flex-col items-center justify-center text-center relative overflow-hidden">
@@ -1028,6 +1090,7 @@ export const SpeakingCompanion: React.FC<SpeakingCompanionProps> = ({ initialSta
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 

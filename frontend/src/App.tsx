@@ -68,6 +68,9 @@ export const App: React.FC = () => {
               <Route path="/speak" element={<SpeakingCompanion initialStage="partner-select" />} />
               <Route path="/speaking" element={<SpeakingCompanion initialStage="partner-select" />} />
               <Route path="/speaking-session" element={<SpeakingCompanion initialStage="room" />} />
+              <Route path="/avatar" element={<SpeakingCompanion initialStage="room" />} />
+              <Route path="/avatar-companion" element={<SpeakingCompanion initialStage="room" />} />
+              <Route path="/avatar-coach" element={<SpeakingCompanion initialStage="room" />} />
 
               {/* Backward compatibility aliases */}
               <Route path="/practice" element={<Navigate to="/speaking" replace />} />
