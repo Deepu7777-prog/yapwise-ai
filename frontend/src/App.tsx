@@ -14,6 +14,9 @@ import { NotFound } from './pages/NotFound';
 // The Two Destination Core Hubs
 import { CareerDashboard } from './pages/CareerDashboard';
 import { SpeakingCompanion } from './pages/SpeakingCompanion';
+import { TwoWayMockInterview } from './components/interview/TwoWayMockInterview';
+import { OpportunityAlerts } from './pages/OpportunityAlerts';
+import { ResumeScanner } from './pages/ResumeScanner';
 
 export const App: React.FC = () => {
   return (
@@ -55,10 +58,20 @@ export const App: React.FC = () => {
               {/* Screen 3: AI Slide Maker */}
               <Route path="/slides" element={<CareerDashboard initialView="slides" />} />
 
-              {/* Screen 7: Technical Interview Practice */}
-              <Route path="/interview" element={<CareerDashboard initialView="interview" />} />
-              <Route path="/interview/technical" element={<CareerDashboard initialView="interview" />} />
-              <Route path="/interview/hr" element={<CareerDashboard initialView="interview" />} />
+              {/* Screen 7: Realistic Two-Way AI Video Mock Interview */}
+              <Route path="/mock-interview" element={<TwoWayMockInterview />} />
+              <Route path="/interview" element={<TwoWayMockInterview />} />
+              <Route path="/interview-prep" element={<TwoWayMockInterview />} />
+              <Route path="/interview/technical" element={<TwoWayMockInterview />} />
+              <Route path="/interview/hr" element={<TwoWayMockInterview />} />
+
+              {/* Opportunities & Placement Alerts (Internships, Hackathons, Scholarships, Jobs) */}
+              <Route path="/opportunities" element={<OpportunityAlerts />} />
+              <Route path="/alerts" element={<OpportunityAlerts />} />
+
+              {/* AI Resume Scanner & ATS Optimizer */}
+              <Route path="/resume" element={<ResumeScanner />} />
+              <Route path="/resume-scanner" element={<ResumeScanner />} />
 
               {/* Screen 9: Progress Reports */}
               <Route path="/progress" element={<CareerDashboard initialView="progress" />} />

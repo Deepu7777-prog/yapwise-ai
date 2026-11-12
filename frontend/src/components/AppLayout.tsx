@@ -20,6 +20,8 @@ import {
   Briefcase,
   Menu,
   Palette,
+  Video,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, THEMES, AppTheme } from '../context/ThemeContext';
@@ -134,9 +136,16 @@ export function AppLayout() {
       ],
     },
     {
-      title: 'AI PRACTICE',
+      title: 'PLACEMENT & INTERVIEW PREP',
       items: [
-        { label: 'AI Talking Avatar', icon: Sparkles, path: '/avatar' },
+        { label: 'Mock Interview (2-Way)', icon: Video, path: '/interview' },
+        { label: 'Opportunity Alerts', icon: Bell, path: '/opportunities' },
+        { label: 'Resume Scanner & ATS', icon: FileText, path: '/resume' },
+      ],
+    },
+    {
+      title: 'AI PRACTICE & SPEECH',
+      items: [
         { label: 'Speak with AI', icon: Mic, path: '/speaking' },
         { label: 'My Progress', icon: BarChart3, path: '/session-report' },
       ],
@@ -184,8 +193,11 @@ export function AppLayout() {
                     const Icon = item.icon;
                     const isActive =
                       location.pathname === item.path ||
+                      (item.path === '/interview' && (location.pathname === '/mock-interview' || location.pathname === '/interview-prep' || location.pathname.startsWith('/interview'))) ||
+                      (item.path === '/opportunities' && location.pathname === '/alerts') ||
+                      (item.path === '/resume' && location.pathname === '/resume-scanner') ||
                       (item.path === '/career-path' && (location.pathname === '/roadmap' || location.pathname === '/assessment' || location.pathname === '/career-mentor')) ||
-                      (item.path === '/speaking' && (location.pathname === '/speak' || location.pathname === '/speaking-session'));
+                      (item.path === '/speaking' && (location.pathname === '/speak' || location.pathname === '/speaking-session' || location.pathname === '/avatar'));
 
                     return (
                       <NavLink
@@ -479,8 +491,11 @@ export function AppLayout() {
                         const Icon = item.icon;
                         const isActive =
                           location.pathname === item.path ||
+                          (item.path === '/interview' && (location.pathname === '/mock-interview' || location.pathname === '/interview-prep' || location.pathname.startsWith('/interview'))) ||
+                          (item.path === '/opportunities' && location.pathname === '/alerts') ||
+                          (item.path === '/resume' && location.pathname === '/resume-scanner') ||
                           (item.path === '/career-path' && (location.pathname === '/roadmap' || location.pathname === '/assessment' || location.pathname === '/career-mentor')) ||
-                          (item.path === '/speaking' && (location.pathname === '/speak' || location.pathname === '/speaking-session'));
+                          (item.path === '/speaking' && (location.pathname === '/speak' || location.pathname === '/speaking-session' || location.pathname === '/avatar'));
 
                         return (
                           <NavLink

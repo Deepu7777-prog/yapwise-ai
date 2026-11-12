@@ -397,4 +397,46 @@ export const api = {
         body: JSON.stringify(data),
       }),
   },
+
+  // 14. Opportunity Alerts (Internships, Hackathons, Scholarships, Jobs)
+  opportunities: {
+    getAlerts: (target_role?: string) =>
+      request<Array<{
+        id: string;
+        title: string;
+        organization: string;
+        type: 'internship' | 'hackathon' | 'scholarship' | 'job';
+        category: string;
+        location: string;
+        stipend_or_reward: string;
+        deadline: string;
+        skill_match_percent: number;
+        required_skills: string[];
+        description: string;
+        interview_role_focus: string;
+        urgency: string;
+        badge_color: string;
+      }>>(`/opportunities/alerts${target_role ? `?target_role=${encodeURIComponent(target_role)}` : ''}`),
+  },
+
+  // 15. AI Resume Scanner & ATS Optimizer
+  resume: {
+    scan: (resume_text: string, target_role?: string) =>
+      request<{
+        ats_score: number;
+        verdict: string;
+        summary: string;
+        strengths: string[];
+        missing_keywords: string[];
+        enhanced_bullet_points: Array<{
+          original: string;
+          improved: string;
+          impact_reason: string;
+        }>;
+        custom_interview_questions: string[];
+      }>('/resume/scan', {
+        method: 'POST',
+        body: JSON.stringify({ resume_text, target_role }),
+      }),
+  },
 };

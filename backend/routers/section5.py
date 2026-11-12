@@ -1194,3 +1194,45 @@ def generate_slides_endpoint(payload: SlideGeneratePayload, user: User = Depends
         style=payload.style or "Modern Purple"
     )
     return slides_deck
+
+
+# ==========================================
+# 13. OPPORTUNITY ALERTS & NOTIFICATIONS
+# ==========================================
+class OpportunityQueryPayload(BaseModel):
+    target_role: Optional[str] = "Software Engineer"
+    skills: Optional[List[str]] = None
+
+@router.get("/opportunities/alerts")
+def get_opportunities_alerts(
+    target_role: Optional[str] = "Software Engineer",
+    user: User = Depends(get_current_user)
+):
+    skills_list = []
+    if user and hasattr(user, "skills") and user.skills:
+        try:
+            skills_list = json.loads(user.skills) if isinstance(user.skills, str) else user.skills
+        except Exception:
+            skills_list = ["Python", "Java", "SQL", "Git"]
+    role = target_role or (user.target_role if user else None) or "Software Engineer"
+    return gemini_service.get_opportunity_alerts(target_role=role, skills=skills_list)
+
+
+# ==========================================
+# 14. AI RESUME SCANNER & ATS ENHANCER
+# ==========================================
+class ResumeScanPayload(BaseModel):
+    resume_text: str
+    target_role: Optional[str] = "Software Engineer"
+
+@router.post("/resume/scan")
+def scan_resume_endpoint(
+    payload: ResumeScanPayload,
+    user: User = Depends(get_current_user)
+):
+    role = payload.target_role or (user.target_role if user else None) or "Software Engineer"
+    result = gemini_service.analyze_resume(
+        resume_text=payload.resume_text,
+        target_role=role
+    )
+    return result

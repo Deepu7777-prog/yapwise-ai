@@ -64,6 +64,7 @@ import {
   Download,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { TwoWayMockInterview } from '../components/interview/TwoWayMockInterview';
 
 interface CareerDashboardProps {
   initialView?: 'hub' | 'profile' | 'assessment' | 'roadmap' | 'mentor' | 'learning' | 'slides' | 'interview' | 'progress';
@@ -2000,81 +2001,12 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({ initialView = 
       {/* SCREEN 7: TECHNICAL INTERVIEW PRACTICE                                    */}
       {/* ========================================================================= */}
       {activeView === 'interview' && (
-        <div className="space-y-6 animate-fadeIn">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setActiveView('hub')}
-              className="flex items-center gap-2 text-xs font-bold text-[#77718B] hover:text-[#302B42] cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Dashboard</span>
-            </button>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#EDE7FF] text-xs font-bold text-[#302B42]">
-              <Clock className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-              <span>00:00:{interviewTimer.toString().padStart(2, '0')}</span>
-            </div>
-          </div>
-
-          <div className="rounded-3xl p-6 sm:p-8 bg-white border-2 border-[#EDE7FF] shadow-card grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-            
-            {/* Left: AI Technical Interviewer Console */}
-            <div className="md:col-span-5 flex flex-col items-center justify-center text-center p-6 rounded-2xl bg-gradient-to-b from-[#F8F6FF] to-[#EDE7FF]/40 border border-[#EDE7FF]">
-              <div className="relative w-36 h-36 flex items-center justify-center">
-                <motion.div
-                  animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-400 to-[#FF9A91] blur-xl pointer-events-none"
-                />
-                <div className="relative z-10 w-24 h-24 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex flex-col items-center justify-center text-white shadow-lg">
-                  <Briefcase className="w-9 h-9 drop-shadow-md mb-0.5" />
-                  <span className="text-[9px] font-black uppercase tracking-wider">Interviewer</span>
-                </div>
-              </div>
-              <span className="font-heading font-black text-sm text-[#302B42] mt-3">Campus Placement AI Simulator</span>
-              <span className="text-[10px] text-[#77718B]">Real-time evaluation on clarity & correctness</span>
-            </div>
-
-            {/* Right: Question and Record Controls */}
-            <div className="md:col-span-7 space-y-5">
-              <div>
-                <span className="text-xs font-black text-[#7652C8] uppercase tracking-wider block">
-                  Question {interviewQuestionIndex + 1} of {interviewQuestions.length}
-                </span>
-                <h3 className="font-heading font-black text-xl sm:text-2xl text-[#302B42] mt-1">
-                  "{interviewQuestions[interviewQuestionIndex].question}"
-                </h3>
-                <p className="text-xs text-[#77718B] mt-2">
-                  <strong>Tip:</strong> {interviewQuestions[interviewQuestionIndex].hint}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button
-                  variant={isInterviewRecording ? 'secondary' : 'primary'}
-                  size="lg"
-                  onClick={() => setIsInterviewRecording(!isInterviewRecording)}
-                  className="rounded-2xl"
-                >
-                  <Mic className="w-4 h-4 mr-2" />
-                  {isInterviewRecording ? 'Stop Recording' : 'Record Answer'}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => {
-                    setInterviewQuestionIndex((prev) => (prev + 1) % interviewQuestions.length);
-                    setInterviewTimer(45);
-                    setIsInterviewRecording(false);
-                  }}
-                  className="rounded-2xl text-[#77718B]"
-                >
-                  Skip Question
-                </Button>
-              </div>
-            </div>
-          </div>
+        <div className="space-y-4 animate-fadeIn">
+          <TwoWayMockInterview
+            role={editRole || 'Software Engineer'}
+            companyTarget="Campus Placement Drive"
+            onExit={() => setActiveView('hub')}
+          />
         </div>
       )}
 
