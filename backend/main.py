@@ -44,19 +44,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount API Routers
-app.include_router(auth_router, prefix="/api")
-app.include_router(auth_router, prefix=settings.API_V1_STR)
-app.include_router(practice_router, prefix=settings.API_V1_STR)
-app.include_router(interview_router, prefix=settings.API_V1_STR)
-app.include_router(gd_router, prefix=settings.API_V1_STR)
-app.include_router(learning_router, prefix=settings.API_V1_STR)
-app.include_router(progress_router, prefix=settings.API_V1_STR)
-app.include_router(reminders_router, prefix=settings.API_V1_STR)
-
-# Section 5 router mounted at both /api and /api/v1 for unified compatibility
-app.include_router(section5_router, prefix="/api")
-app.include_router(section5_router, prefix=settings.API_V1_STR)
+# Mount API Routers (mounted at both /api and /api/v1 for universal frontend compatibility)
+for prefix in ["/api", settings.API_V1_STR]:
+    app.include_router(auth_router, prefix=prefix)
+    app.include_router(practice_router, prefix=prefix)
+    app.include_router(interview_router, prefix=prefix)
+    app.include_router(gd_router, prefix=prefix)
+    app.include_router(learning_router, prefix=prefix)
+    app.include_router(progress_router, prefix=prefix)
+    app.include_router(reminders_router, prefix=prefix)
+    app.include_router(section5_router, prefix=prefix)
 
 
 @app.exception_handler(Exception)
@@ -69,6 +66,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/api/health", tags=["Health"])
+@app.get("/api/v1/health", tags=["Health"])
 def health_check():
     return {
         "status": "healthy",

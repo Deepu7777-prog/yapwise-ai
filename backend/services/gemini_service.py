@@ -84,7 +84,15 @@ class GeminiService:
 
     def _clean_json(self, raw_text: str) -> str:
         """Strips markdown code fences and whitespace from model JSON outputs."""
+        if not raw_text:
+            return ""
         text = raw_text.strip()
+        # Look for code block ```json ... ``` or ``` ... ```
+        block_match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+        if block_match:
+            return block_match.group(1).strip()
+
+        # If no closing backticks, handle case where output started with ```json
         if text.startswith("```json"):
             text = text[7:]
         elif text.startswith("```"):
@@ -109,6 +117,14 @@ class GeminiService:
             candidate = match.group(0)
             try:
                 return json.loads(candidate, strict=False)
+            except Exception:
+                pass
+
+        # Try extracting from raw_text directly if cleaned stripped too much
+        match_raw = re.search(r'\{.*\}', raw_text, re.DOTALL)
+        if match_raw:
+            try:
+                return json.loads(match_raw.group(0), strict=False)
             except Exception:
                 pass
 
@@ -146,11 +162,9 @@ Return ONLY valid JSON.
 """
         raw = self._call_gemini_api(prompt)
         if raw:
-            try:
-                cleaned = self._clean_json(raw)
-                return json.loads(cleaned)
-            except Exception as e:
-                logger.error(f"Error parsing Gemini practice evaluation JSON: {e}")
+            parsed = self._parse_json_safely(raw)
+            if parsed and isinstance(parsed, dict) and "clarity_score" in parsed:
+                return parsed
 
         return self._fallback_practice_evaluation(transcript, topic, mode, wpm, filler_count)
 
@@ -178,11 +192,9 @@ Return ONLY valid JSON.
 """
         raw = self._call_gemini_api(prompt)
         if raw:
-            try:
-                cleaned = self._clean_json(raw)
-                return json.loads(cleaned)
-            except Exception as e:
-                logger.error(f"Error parsing Gemini interview question JSON: {e}")
+            parsed = self._parse_json_safely(raw)
+            if parsed and isinstance(parsed, dict) and "question" in parsed:
+                return parsed
 
         return self._fallback_interview_question(interview_type, role, len(history))
 
@@ -206,11 +218,9 @@ Return ONLY valid JSON.
 """
         raw = self._call_gemini_api(prompt)
         if raw:
-            try:
-                cleaned = self._clean_json(raw)
-                return json.loads(cleaned)
-            except Exception as e:
-                logger.error(f"Error parsing Gemini interview answer evaluation: {e}")
+            parsed = self._parse_json_safely(raw)
+            if parsed and isinstance(parsed, dict) and "score" in parsed:
+                return parsed
 
         return self._fallback_answer_evaluation(interview_type, answer)
 
@@ -256,11 +266,9 @@ Return ONLY valid JSON.
 """
         raw = self._call_gemini_api(prompt)
         if raw:
-            try:
-                cleaned = self._clean_json(raw)
-                return json.loads(cleaned)
-            except Exception as e:
-                logger.error(f"Error parsing Gemini GD response: {e}")
+            parsed = self._parse_json_safely(raw)
+            if parsed and isinstance(parsed, dict) and "ai_reactions" in parsed:
+                return parsed
 
         return self._fallback_gd_turn(topic, user_argument)
 
@@ -326,13 +334,9 @@ Return ONLY valid JSON.
 """
         raw = self._call_gemini_api(prompt, timeout=18)
         if raw:
-            try:
-                cleaned = self._clean_json(raw)
-                parsed = json.loads(cleaned)
-                if "milestones" in parsed and len(parsed["milestones"]) >= 5:
-                    return parsed
-            except Exception as e:
-                logger.error(f"Error parsing Gemini career roadmap JSON: {e}")
+            parsed = self._parse_json_safely(raw)
+            if parsed and isinstance(parsed, dict) and "milestones" in parsed and len(parsed["milestones"]) >= 5:
+                return parsed
 
         return self._fallback_career_roadmap(profile)
 
