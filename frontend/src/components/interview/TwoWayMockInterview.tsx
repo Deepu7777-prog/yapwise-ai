@@ -23,7 +23,9 @@ import {
   Send,
   BookOpen,
 } from 'lucide-react';
-import { PhotoRealisticMentorAvatar, MentorState } from '../avatar/PhotoRealisticMentorAvatar';
+import { RealisticHumanAvatar, AvatarState } from '../avatar/RealisticHumanAvatar';
+import { REALISTIC_AVATARS, AvatarProfile } from '../../lib/avatars';
+import { useAudioReactiveLipSync } from '../../hooks/useAudioReactiveLipSync';
 import { LipSyncController, MouthMorphTarget, VISEME_TARGETS } from '../../lib/lipSyncEngine';
 import { useSpeechSynthesis, getFemaleMentorVoice } from '../../hooks/useSpeechSynthesis';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
@@ -67,15 +69,35 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
   role = 'Software Engineer',
   companyTarget = 'Tier-1 Campus Placements',
   customQuestions,
+  interviewerId,
   onExit,
   className = '',
 }) => {
+  // Avatar Selection State (Default: Dr. Priya Sharma - Flagship Executive Mentor)
+  const [selectedAvatar, setSelectedAvatar] = useState<AvatarProfile>(() => {
+    if (interviewerId) {
+      const found = REALISTIC_AVATARS.find((a) => a.id === interviewerId);
+      if (found) return found;
+    }
+    return REALISTIC_AVATARS[0]; // Dr. Priya Sharma (Female Executive Coach)
+  });
+
   // 1. Camera & Audio Stream for Student Video Tile
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const studentVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const aiAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Audio-Reactive Web Audio API Lip-Sync Hook
+  const audioMetrics = useAudioReactiveLipSync({
+    audioElementRef: aiAudioRef,
+    onStateChange: (mState) => {
+      if (mState === 'closed' && mentorState === 'speaking' && !isSpeaking) {
+        setMentorState('listening');
+      }
+    },
+  });
 
   // 2. Interview Questions Configuration
   const [questions] = useState<InterviewQuestionItem[]>(() => {
@@ -130,7 +152,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
   const currentQuestion = questions[currentQIndex];
 
   // 3. Conversation States & Audio Engine
-  const [mentorState, setMentorState] = useState<MentorState>('ready');
+  const [mentorState, setMentorState] = useState<AvatarState>('ready');
   const [sessionTimerSec, setSessionTimerSec] = useState(0);
   const [studentAnswerText, setStudentAnswerText] = useState('');
   const [evaluations, setEvaluations] = useState<
@@ -172,12 +194,6 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
     }
   });
 
-  // Lip Sync Controller
-  const lipSyncControllerRef = useRef<LipSyncController>(new LipSyncController());
-  const [currentMouthTarget, setCurrentMouthTarget] = useState<MouthMorphTarget>({
-    ...VISEME_TARGETS.viseme_sil,
-  });
-
   // Speech Hooks
   const { isSpeaking, speak, cancel: cancelSpeech, voices } = useSpeechSynthesis();
   const {
@@ -189,6 +205,27 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
     resetTranscript,
     error: micError,
   } = useSpeechRecognition('en-IN');
+
+  // Lip Sync Controller
+  const lipSyncControllerRef = useRef<LipSyncController>(new LipSyncController());
+  const [currentMouthTarget, setCurrentMouthTarget] = useState<MouthMorphTarget>({
+    ...VISEME_TARGETS.viseme_sil,
+  });
+
+  // Audio-reactive dynamic lip-sync metrics
+  const isAudioActive = audioMetrics.isAudioPlaying;
+  const activeAudioLevel = isAudioActive ? audioMetrics.volume : (isSpeaking ? 0.35 : 0);
+
+  const effectiveMouthTarget: MouthMorphTarget = {
+    ...currentMouthTarget,
+    mouthOpen: isAudioActive ? audioMetrics.mouthOpen : currentMouthTarget.mouthOpen,
+    mouthWide: isAudioActive ? audioMetrics.mouthWide : currentMouthTarget.mouthWide,
+    jawDrop: isAudioActive ? audioMetrics.mouthOpen * 0.75 : currentMouthTarget.jawDrop,
+    upperTeeth: (isAudioActive ? audioMetrics.mouthOpen : currentMouthTarget.mouthOpen) > 0.22 ? 0.65 : 0.2,
+    lowerTeeth: (isAudioActive ? audioMetrics.mouthOpen : currentMouthTarget.mouthOpen) > 0.48 ? 0.45 : 0.0,
+    tongueVisible: (isAudioActive ? audioMetrics.mouthOpen : currentMouthTarget.mouthOpen) > 0.4 ? 0.5 : 0.0,
+    smileCurve: 0.25,
+  };
 
   // Camera Initialization
   useEffect(() => {
@@ -285,10 +322,12 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         } catch {}
       }
 
-      const targetVoice = getFemaleMentorVoice(voices);
+      const targetVoice = selectedAvatar.gender === 'female'
+        ? getFemaleMentorVoice(voices)
+        : (voices.find((v) => selectedAvatar.voiceConfig.targetKeywords.some((kw) => v.name.toLowerCase().includes(kw))) || null);
       const utterance = new SpeechSynthesisUtterance(questionText);
-      utterance.pitch = 1.15;
-      utterance.rate = 0.98;
+      utterance.pitch = selectedAvatar.voiceConfig.pitch || 1.15;
+      utterance.rate = selectedAvatar.voiceConfig.rate || 0.98;
       if (targetVoice) utterance.voice = targetVoice;
 
       utterance.onstart = () => {
@@ -324,7 +363,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         startListening();
       }
     },
-    [voices, resetTranscript, startListening]
+    [voices, selectedAvatar, resetTranscript, startListening]
   );
 
   /**
@@ -370,11 +409,12 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
     [cancelSpeech, stopListening, playSpeechSynthesisFallback, resetTranscript, startListening]
   );
 
-  const startInterviewCall = useCallback(() => {
+  const startInterviewCall = useCallback(async () => {
     setIsCallStarted(true);
-    const greetingText = `Good day! I'm your AI Mentor Aaradhya at YapWise AI. Welcome to your ${companyTarget} placement interview. Let's begin with question one: ${questions[0].question}`;
+    await audioMetrics.unlockAudioContext();
+    const greetingText = `Good day! I'm ${selectedAvatar.name}, your ${selectedAvatar.role} at YapWise AI. Welcome to your ${companyTarget} placement interview. Let's begin with question one: ${questions[0].question}`;
     askQuestionAloud(greetingText);
-  }, [companyTarget, questions, askQuestionAloud]);
+  }, [selectedAvatar, companyTarget, questions, askQuestionAloud, audioMetrics]);
 
   /**
    * Submit Student Answer for AI STAR Evaluation
@@ -542,26 +582,58 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
           <motion.div
             initial={{ scale: 0.92, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-[#1C1630] border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-5 shadow-2xl text-white"
+            className="bg-[#1C1630] border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 shadow-2xl text-white"
           >
-            <div className="relative w-28 h-28 mx-auto rounded-3xl overflow-hidden border-2 border-purple-400 shadow-2xl shadow-purple-600/30">
-              <img
-                src="/ai_mentor.jpg"
-                alt="AI Mentor Aaradhya"
-                className="w-full h-full object-cover"
+            {/* Native Vector Animated Avatar Visual Preview */}
+            <div className="relative w-32 h-36 mx-auto rounded-3xl overflow-hidden border-2 border-purple-400 shadow-2xl shadow-purple-600/30 bg-[#141024] flex items-center justify-center p-1">
+              <RealisticHumanAvatar
+                avatar={selectedAvatar}
+                state="ready"
+                size="sm"
+                className="w-full h-full transform scale-110"
               />
               <div className="absolute bottom-0 inset-x-0 bg-purple-600/90 text-[10px] font-black text-white py-0.5 tracking-wider">
-                AI MENTOR
+                {selectedAvatar.badge.toUpperCase()}
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <h3 className="font-heading font-black text-xl text-white">
                 Ready for Your Mock Interview?
               </h3>
               <p className="text-xs text-white/75 leading-relaxed">
-                Your AI Placement Mentor <span className="text-purple-300 font-bold">Aaradhya</span> is waiting in the studio for your <span className="text-white font-semibold">{companyTarget}</span> interview.
+                Your AI Placement Mentor <span className="text-purple-300 font-bold">{selectedAvatar.name}</span> is ready for your <span className="text-white font-semibold">{companyTarget}</span> interview.
               </p>
+            </div>
+
+            {/* Mentor Selection Roster Options */}
+            <div className="space-y-2 pt-1 text-left">
+              <span className="text-[11px] font-semibold text-white/70 block text-center">
+                Choose Your Preferred AI Interviewer:
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {REALISTIC_AVATARS.slice(0, 4).map((av) => (
+                  <button
+                    key={av.id}
+                    type="button"
+                    onClick={() => setSelectedAvatar(av)}
+                    className={cn(
+                      'p-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer text-left',
+                      selectedAvatar.id === av.id
+                        ? 'bg-purple-600/30 border-purple-400 text-white shadow-md shadow-purple-500/20'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10'
+                    )}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: av.accentColor }} />
+                    <div className="truncate">
+                      <div className="font-bold truncate text-[11px]">{av.name}</div>
+                      <div className="text-[10px] text-white/50 truncate">
+                        {av.gender === 'female' ? 'Female' : 'Male'} • {av.badge}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
@@ -574,7 +646,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
             </button>
 
             <p className="text-[11px] text-white/50">
-              Starts real-time female AI voice, mouth movement & microphone
+              Starts real-time natural voice, synchronized animated avatar & microphone
             </p>
           </motion.div>
         </div>
@@ -641,18 +713,65 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
       {/* 2. TWO-WAY VIDEO SCREEN GRID (Female AI Mentor + Candidate Tile) */}
       {/* ------------------------------------------------------------- */}
       <div className="flex-1 p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
-        {/* TILE 1: FEMALE AI MENTOR (Prominent Visual with Lip-Sync & Eye Contact) */}
+        {/* TILE 1: FEMALE AI MENTOR (YapWise Native Animated Vector Mentor) */}
         <div className="lg:col-span-7 rounded-3xl border border-white/15 bg-gradient-to-b from-[#211B38] to-[#141024] p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden shadow-xl min-h-[360px] sm:min-h-[420px]">
-          {/* Main Visual: Realistic Female AI Mentor with Web Audio Reactive Lip-Sync */}
-          <div className="relative w-full h-full min-h-[300px] sm:min-h-[360px] rounded-2xl overflow-hidden shadow-inner">
+          {/* Top Mentor Badge & Live State Indicator */}
+          <div className="flex items-center justify-between z-10 pb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-xs font-bold text-white">
+              <span
+                className={cn(
+                  'w-2 h-2 rounded-full',
+                  mentorState === 'speaking'
+                    ? 'bg-purple-400 animate-ping'
+                    : mentorState === 'listening'
+                    ? 'bg-emerald-400 animate-pulse'
+                    : mentorState === 'thinking'
+                    ? 'bg-amber-400'
+                    : 'bg-purple-400'
+                )}
+              />
+              <span>{selectedAvatar.name}</span>
+              <span className="text-[10px] text-purple-300 font-semibold hidden sm:inline">
+                • {selectedAvatar.badge}
+              </span>
+            </div>
+
+            {/* Live Conversation State Pill */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold text-white/90">
+              {mentorState === 'speaking' && (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-purple-300 animate-spin" />
+                  <span className="text-purple-200">Speaking...</span>
+                </>
+              )}
+              {mentorState === 'listening' && (
+                <>
+                  <Mic className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                  <span className="text-emerald-200">Listening to you...</span>
+                </>
+              )}
+              {mentorState === 'thinking' && (
+                <>
+                  <Clock className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                  <span className="text-amber-200">Analyzing answer...</span>
+                </>
+              )}
+              {mentorState === 'ready' && (
+                <span className="text-white/70">Ready to talk</span>
+              )}
+            </div>
+          </div>
+
+          {/* Main Visual: Realistic Animated Avatar with Native Kinetic Mesh */}
+          <div className="relative w-full flex-1 min-h-[300px] sm:min-h-[360px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-b from-[#1C1630] to-[#0E0B1A] border border-white/5">
             <audio ref={aiAudioRef} crossOrigin="anonymous" playsInline className="hidden" />
-            <PhotoRealisticMentorAvatar
+            <RealisticHumanAvatar
+              avatar={selectedAvatar}
               state={mentorState}
-              mouthTarget={currentMouthTarget}
-              isSpeaking={isSpeaking}
-              isListening={isListening}
-              audioElementRef={aiAudioRef}
-              className="w-full h-full rounded-2xl"
+              mouthTarget={effectiveMouthTarget}
+              audioLevel={activeAudioLevel}
+              size="full"
+              className="w-full h-full"
             />
           </div>
 

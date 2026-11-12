@@ -11,7 +11,7 @@ interface RealisticHumanAvatarProps {
   mouthTarget?: MouthMorphTarget;
   audioLevel?: number; // 0.0 to 1.0 (from microphone or audio output)
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
 }
 
 export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
@@ -166,11 +166,13 @@ export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
   const browFurrow = state === 'thinking' ? 3 : 0;
 
   // Dimensions
-  const sizeMap = {
+  const sizeMap: Record<string, string> = {
     sm: 'w-44 h-48',
     md: 'w-64 h-72',
     lg: 'w-80 h-96 sm:w-96 sm:h-[420px]',
     xl: 'w-96 h-[460px] sm:w-[480px] sm:h-[540px]',
+    '2xl': 'w-full h-full max-w-[520px] max-h-[480px]',
+    full: 'w-full h-full min-h-[300px]',
   };
 
   // Mouth calculation parameters
@@ -242,6 +244,14 @@ export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
           <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#000" floodOpacity="0.25" />
           </filter>
+
+          {/* Eye Socket Clip Paths for Natural In-Socket Blinking */}
+          <clipPath id={`left-eye-clip-${avatar.id}`}>
+            <path d="M -18 0 C -12 -9, 12 -9, 18 0 C 12 8, -12 8, -18 0 Z" />
+          </clipPath>
+          <clipPath id={`right-eye-clip-${avatar.id}`}>
+            <path d="M -18 0 C -12 -9, 12 -9, 18 0 C 12 8, -12 8, -18 0 Z" />
+          </clipPath>
         </defs>
 
         {/* ------------------------------------------------------------- */}
@@ -361,7 +371,7 @@ export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
             fill="none"
           />
 
-          {/* Left Eye Sclera */}
+          {/* Left Eye Sclera & Iris */}
           <g transform={`translate(145, 168)`}>
             {/* White of eye */}
             <path
@@ -370,21 +380,24 @@ export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
               stroke={visualTraits.skinShadow}
               strokeWidth="1"
             />
-            {/* Iris & Pupil (moves with eyeGaze) */}
-            <g transform={`translate(${eyeGaze.x}, ${eyeGaze.y})`}>
-              <circle cx="0" cy="0" r="7.5" fill={visualTraits.eyeColor} />
-              <circle cx="0" cy="0" r="3.6" fill="#0B0908" />
-              {/* Catchlight glint */}
-              <circle cx="-2.5" cy="-2.5" r="2.0" fill="#FFFFFF" />
-              <circle cx="2.2" cy="2.2" r="1.0" fill="#FFFFFF" opacity="0.8" />
+            {/* Clipped Iris & In-Socket Eyelid */}
+            <g clipPath={`url(#left-eye-clip-${avatar.id})`}>
+              {/* Iris & Pupil (moves with eyeGaze) */}
+              <g transform={`translate(${eyeGaze.x}, ${eyeGaze.y})`}>
+                <circle cx="0" cy="0" r="7.5" fill={visualTraits.eyeColor} />
+                <circle cx="0" cy="0" r="3.6" fill="#0B0908" />
+                {/* Catchlight glint */}
+                <circle cx="-2.5" cy="-2.5" r="2.0" fill="#FFFFFF" />
+                <circle cx="2.2" cy="2.2" r="1.0" fill="#FFFFFF" opacity="0.8" />
+              </g>
+              {/* Natural Eyelid Closure (covers down over sclera) */}
+              <path
+                d={`M -22 -14 L 22 -14 L 22 ${-10 + blinkProgress * 22} C 12 ${
+                  -8 + blinkProgress * 19
+                }, -12 ${-8 + blinkProgress * 19}, -22 ${-10 + blinkProgress * 22} Z`}
+                fill={visualTraits.skinTone}
+              />
             </g>
-            {/* Upper Eyelid (Blink Mechanism) */}
-            <path
-              d={`M -20 -1 C -12 ${-10 + blinkProgress * 18}, 12 ${
-                -10 + blinkProgress * 18
-              }, 20 -1 C 12 -12, -12 -12, -20 -1 Z`}
-              fill={visualTraits.skinTone}
-            />
             {/* Eyelash Line */}
             <path
               d={`M -20 0 Q 0 ${-8 + blinkProgress * 16} 20 0`}
@@ -395,7 +408,7 @@ export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
             />
           </g>
 
-          {/* Right Eye Sclera */}
+          {/* Right Eye Sclera & Iris */}
           <g transform={`translate(215, 168)`}>
             {/* White of eye */}
             <path
@@ -404,21 +417,24 @@ export const RealisticHumanAvatar: React.FC<RealisticHumanAvatarProps> = ({
               stroke={visualTraits.skinShadow}
               strokeWidth="1"
             />
-            {/* Iris & Pupil */}
-            <g transform={`translate(${eyeGaze.x}, ${eyeGaze.y})`}>
-              <circle cx="0" cy="0" r="7.5" fill={visualTraits.eyeColor} />
-              <circle cx="0" cy="0" r="3.6" fill="#0B0908" />
-              {/* Catchlight glint */}
-              <circle cx="-2.5" cy="-2.5" r="2.0" fill="#FFFFFF" />
-              <circle cx="2.2" cy="2.2" r="1.0" fill="#FFFFFF" opacity="0.8" />
+            {/* Clipped Iris & In-Socket Eyelid */}
+            <g clipPath={`url(#right-eye-clip-${avatar.id})`}>
+              {/* Iris & Pupil */}
+              <g transform={`translate(${eyeGaze.x}, ${eyeGaze.y})`}>
+                <circle cx="0" cy="0" r="7.5" fill={visualTraits.eyeColor} />
+                <circle cx="0" cy="0" r="3.6" fill="#0B0908" />
+                {/* Catchlight glint */}
+                <circle cx="-2.5" cy="-2.5" r="2.0" fill="#FFFFFF" />
+                <circle cx="2.2" cy="2.2" r="1.0" fill="#FFFFFF" opacity="0.8" />
+              </g>
+              {/* Natural Eyelid Closure (covers down over sclera) */}
+              <path
+                d={`M -22 -14 L 22 -14 L 22 ${-10 + blinkProgress * 22} C 12 ${
+                  -8 + blinkProgress * 19
+                }, -12 ${-8 + blinkProgress * 19}, -22 ${-10 + blinkProgress * 22} Z`}
+                fill={visualTraits.skinTone}
+              />
             </g>
-            {/* Upper Eyelid (Blink Mechanism) */}
-            <path
-              d={`M -20 -1 C -12 ${-10 + blinkProgress * 18}, 12 ${
-                -10 + blinkProgress * 18
-              }, 20 -1 C 12 -12, -12 -12, -20 -1 Z`}
-              fill={visualTraits.skinTone}
-            />
             {/* Eyelash Line */}
             <path
               d={`M -20 0 Q 0 ${-8 + blinkProgress * 16} 20 0`}
