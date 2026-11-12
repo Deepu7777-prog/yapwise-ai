@@ -2,8 +2,12 @@ import io
 import datetime
 import json
 import logging
+import re
+import urllib.parse
+import requests
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -1293,4 +1297,78 @@ def career_help_endpoint(
         question=payload.question,
         context=payload.context
     )
+
+# ==========================================
+# 16. AI VOICE TTS STREAMING (MP3 PIPELINE)
+# ==========================================
+TTS_AUDIO_CACHE: Dict[str, bytes] = {}
+
+@router.get("/voice/tts")
+def stream_tts_audio(
+    text: str = Query(..., description="Text to synthesize into speech"),
+    lang: str = Query("en-IN", description="Language code e.g. en-IN or en-US")
+):
+    """
+    Streams natural audio (MP3) for Web Audio API & HTML5 <audio> element.
+    Enables AudioContext, MediaElementAudioSourceNode and AnalyserNode reactivity.
+    """
+    clean_text = text.strip()
+    if not clean_text:
+        raise HTTPException(status_code=400, detail="Empty text provided")
+
+    cache_key = f"{lang}:{clean_text[:200]}"
+    if cache_key in TTS_AUDIO_CACHE:
+        return StreamingResponse(
+            io.BytesIO(TTS_AUDIO_CACHE[cache_key]),
+            media_type="audio/mpeg",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+            }
+        )
+
+    # Split into sentence chunks under 180 chars for clean concatenation
+    sentences = re.split(r'([.!?]+)', clean_text)
+    chunks = []
+    curr = ''
+    for part in sentences:
+        if len(curr) + len(part) < 180:
+            curr += part
+        else:
+            if curr.strip():
+                chunks.append(curr.strip())
+            curr = part
+    if curr.strip():
+        chunks.append(curr.strip())
+
+    audio_bytes = bytearray()
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+    for chunk in chunks[:6]:
+        try:
+            encoded = urllib.parse.quote(chunk)
+            url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang}&client=tw-ob&q={encoded}"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                audio_bytes.extend(res.content)
+        except Exception as e:
+            logger.warning(f"TTS chunk fetch error: {e}")
+
+    if not audio_bytes:
+        raise HTTPException(status_code=502, detail="TTS synthesis currently unavailable")
+
+    final_bytes = bytes(audio_bytes)
+    TTS_AUDIO_CACHE[cache_key] = final_bytes
+
+    return StreamingResponse(
+        io.BytesIO(final_bytes),
+        media_type="audio/mpeg",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
 

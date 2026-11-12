@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MouthMorphTarget } from '../../lib/lipSyncEngine';
+import { useAudioReactiveLipSync, MouthState } from '../../hooks/useAudioReactiveLipSync';
 
 export type MentorState = 'ready' | 'speaking' | 'listening' | 'thinking' | 'ended';
 
@@ -9,6 +10,7 @@ interface PhotoRealisticMentorAvatarProps {
   mouthTarget?: MouthMorphTarget;
   isSpeaking?: boolean;
   isListening?: boolean;
+  audioElementRef?: React.RefObject<HTMLAudioElement | null>;
   audioLevel?: number; // 0 to 1
   className?: string;
   showStatusBadge?: boolean;
@@ -21,6 +23,7 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
   mouthTarget,
   isSpeaking = false,
   isListening = false,
+  audioElementRef,
   audioLevel = 0,
   className = '',
   showStatusBadge = true,
@@ -37,22 +40,35 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
       setIsBlinking(true);
       setTimeout(() => {
         setIsBlinking(false);
-        // Next blink between 3.0s and 5.2s
-        const nextInterval = 3000 + Math.random() * 2200;
+        const nextInterval = 3200 + Math.random() * 2400;
         blinkTimeout = setTimeout(triggerBlink, nextInterval);
       }, 130);
     };
 
-    blinkTimeout = setTimeout(triggerBlink, 2500);
+    blinkTimeout = setTimeout(triggerBlink, 2800);
     return () => clearTimeout(blinkTimeout);
   }, []);
 
-  // 2. High-Frequency Real-Time Syllable Oscillator for 100% Visible Lip-Sync
-  // Even if browser TTS boundary events are delayed, this guarantees smooth, natural phonetic lip motion!
+  // 2. Audio-Reactive Lip Sync Hook (Web Audio API AnalyserNode)
+  const defaultAudioRef = useRef<HTMLAudioElement | null>(null);
+  const activeAudioRef = audioElementRef || defaultAudioRef;
+
+  const {
+    mouthState: reactiveMouthState,
+    mouthOpen: reactiveMouthOpen,
+    mouthWide: reactiveMouthWide,
+    volume: reactiveVolume,
+    isAudioPlaying,
+  } = useAudioReactiveLipSync({
+    audioElementRef: activeAudioRef,
+  });
+
+  // 3. Fallback High-Frequency Phonetic Syllable Oscillator
+  // Guarantees smooth viseme modulation when Web Speech API is active or audio element is buffering
   const [syllableAperture, setSyllableAperture] = useState(0);
 
   useEffect(() => {
-    if (!isSpeaking) {
+    if (!isSpeaking && !isAudioPlaying) {
       setSyllableAperture(0);
       return;
     }
@@ -62,10 +78,8 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
 
     const updateSyllables = (now: number) => {
       const elapsed = (now - startTime) / 1000;
-      // 4.2 Hz oscillation (standard English speech syllable rate: ~4 syllables per second)
-      const primaryPulse = (Math.sin(elapsed * 16.5) + 1) / 2; // 0 to 1
-      const cadenceMod = (Math.sin(elapsed * 7.2) + 1) / 2;    // Harmonic variation
-      // Modulation creates varied jaw drops for open vowels vs consonants
+      const primaryPulse = (Math.sin(elapsed * 16.0) + 1) / 2;
+      const cadenceMod = (Math.sin(elapsed * 7.5) + 1) / 2;
       const aperture = primaryPulse * (0.35 + 0.65 * cadenceMod);
       setSyllableAperture(aperture);
 
@@ -74,16 +88,31 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
 
     animId = requestAnimationFrame(updateSyllables);
     return () => cancelAnimationFrame(animId);
-  }, [isSpeaking]);
+  }, [isSpeaking, isAudioPlaying]);
 
-  // Combined mouth metrics: highest of viseme engine or continuous syllable rhythm
-  const rawOpen = Math.max(syllableAperture, mouthTarget?.mouthOpen || 0);
-  const mouthOpen = isSpeaking ? Math.min(1.0, Math.max(0, rawOpen * 1.15)) : 0;
-  const mouthWide = isSpeaking ? (mouthTarget?.mouthWide || 0.6) : 0.35;
+  // Combined mouth metrics: Web Audio Analyser reactive values prioritised
+  const activeSpeaking = isSpeaking || isAudioPlaying;
 
-  // 3. Natural Head Kinetics & Conversational Gestures
+  const rawMouthOpen = isAudioPlaying
+    ? reactiveMouthOpen
+    : Math.max(syllableAperture, mouthTarget?.mouthOpen || 0);
+
+  const finalMouthOpen = activeSpeaking ? Math.min(1.0, Math.max(0, rawMouthOpen)) : 0;
+
+  const finalMouthWide = isAudioPlaying
+    ? reactiveMouthWide
+    : (mouthTarget?.mouthWide || 0.6);
+
+  // Determine current mouth state: 'closed' | 'slightly_open' | 'fully_open'
+  const currentMouthState: MouthState = !activeSpeaking || finalMouthOpen < 0.08
+    ? 'closed'
+    : finalMouthOpen < 0.45
+    ? 'slightly_open'
+    : 'fully_open';
+
+  // 4. Subtle Idle & Conversational Body Kinetics
   const getKineticTransform = (): any => {
-    if (state === 'speaking' || isSpeaking) {
+    if (activeSpeaking || state === 'speaking') {
       return {
         y: [0, -4, 2, -3, 0],
         rotate: [0, -1.4, 1.0, -0.7, 0],
@@ -95,7 +124,7 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
         },
       };
     }
-    if (state === 'listening' || isListening) {
+    if (isListening || state === 'listening') {
       return {
         y: [-3, -1, -3],
         rotate: 1.5, // Attentive forward head tilt
@@ -150,9 +179,10 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
         />
 
         {/* ========================================================================= */}
-        {/* REAL-TIME VISIBLE LIP-READING MOUTH APERTURE                               */}
-        {/* Centered at exact mouth coordinates (x: 51.1%, y: 32.5%)                 */}
-        {/* Flexes open & closed with speech syllables; stops completely when silent   */}
+        {/* AUDIO-REACTIVE 3-STATE MOUTH ANIMATION LAYER                               */}
+        {/* States: 'closed' | 'slightly_open' | 'fully_open'                          */}
+        {/* Driven directly by Web Audio API AnalyserNode volume & frequency            */}
+        {/* Exact coordinates on image: left 51.1%, top 32.5%                          */}
         {/* ========================================================================= */}
         <div
           className="absolute pointer-events-none"
@@ -164,48 +194,79 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
             transform: 'translate(-50%, -50%)',
           }}
         >
-          {isSpeaking && mouthOpen > 0.08 && (
-            <div className="relative w-full h-full flex items-center justify-center">
-              {/* Outer Lip Flesh Shadow Contour */}
+          {/* STATE 1: CLOSED MOUTH -> Overlay is hidden, showing natural smiling lips */}
+
+          {/* STATE 2: SLIGHTLY OPEN (Soft Syllables, Vowel Transitions) */}
+          {currentMouthState === 'slightly_open' && (
+            <div className="relative w-full h-full flex items-center justify-center animate-fadeIn">
               <div
                 className="absolute rounded-full transition-all duration-75"
                 style={{
-                  width: `${Math.max(30, Math.min(85, 42 + mouthWide * 38))}%`,
-                  height: `${Math.max(16, mouthOpen * 62)}%`,
-                  background: 'radial-gradient(ellipse at center, #260A10 35%, #5E1A27 75%, #8A3040 100%)',
-                  boxShadow: '0 0 4px rgba(180, 80, 95, 0.4), inset 0 2px 3px rgba(0,0,0,0.9)',
+                  width: `${Math.max(38, Math.min(68, 45 + finalMouthWide * 20))}%`,
+                  height: `${Math.max(16, finalMouthOpen * 42)}%`,
+                  background: 'radial-gradient(ellipse at center, #260A10 40%, #5E1A27 80%, #8A3040 100%)',
+                  boxShadow: '0 0 3px rgba(180, 80, 95, 0.4), inset 0 2px 3px rgba(0,0,0,0.9)',
                 }}
               >
-                {/* Upper Teeth Arch (Visible on Open Vowels) */}
-                {mouthOpen > 0.22 && (
-                  <div
-                    className="mx-auto rounded-b-md shadow-xs transition-all duration-75"
-                    style={{
-                      width: '64%',
-                      height: `${Math.min(42, mouthOpen * 36)}%`,
-                      background: 'linear-gradient(to bottom, #FFFFFF 0%, #F5EDE4 80%, #D4C7BA 100%)',
-                    }}
-                  />
-                )}
+                {/* Upper Teeth Subtle Edge */}
+                <div
+                  className="mx-auto rounded-b-sm shadow-xs transition-all duration-75"
+                  style={{
+                    width: '60%',
+                    height: '28%',
+                    background: 'linear-gradient(to bottom, #FFFFFF 0%, #EDE4D8 100%)',
+                  }}
+                />
+              </div>
 
-                {/* Lower Lip / Tongue Depth Highlight */}
-                {mouthOpen > 0.45 && (
-                  <div
-                    className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-t-full transition-all duration-75"
-                    style={{
-                      width: '52%',
-                      height: `${mouthOpen * 26}%`,
-                      background: 'linear-gradient(to top, #D46675 0%, #A83E4E 100%)',
-                    }}
-                  />
-                )}
+              {/* Lip Boundary Contour Blend */}
+              <div
+                className="absolute inset-0 rounded-full border border-[#B75365]/30 pointer-events-none"
+                style={{
+                  transform: `scale(${0.92 + finalMouthWide * 0.1}, 0.85)`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* STATE 3: FULLY OPEN (Loud Syllables, Accented Vowels) */}
+          {currentMouthState === 'fully_open' && (
+            <div className="relative w-full h-full flex items-center justify-center animate-fadeIn">
+              <div
+                className="absolute rounded-full transition-all duration-75"
+                style={{
+                  width: `${Math.max(48, Math.min(85, 48 + finalMouthWide * 34))}%`,
+                  height: `${Math.max(28, finalMouthOpen * 65)}%`,
+                  background: 'radial-gradient(ellipse at center, #1F070C 30%, #541723 75%, #8A3040 100%)',
+                  boxShadow: '0 0 5px rgba(190, 85, 100, 0.45), inset 0 2px 4px rgba(0,0,0,0.95)',
+                }}
+              >
+                {/* Full Upper Teeth Arch */}
+                <div
+                  className="mx-auto rounded-b-md shadow-xs transition-all duration-75"
+                  style={{
+                    width: '66%',
+                    height: `${Math.min(44, finalMouthOpen * 38)}%`,
+                    background: 'linear-gradient(to bottom, #FFFFFF 0%, #F5EDE4 80%, #D4C7BA 100%)',
+                  }}
+                />
+
+                {/* Visible Tongue Contour Depth */}
+                <div
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-t-full transition-all duration-75"
+                  style={{
+                    width: '52%',
+                    height: `${finalMouthOpen * 25}%`,
+                    background: 'linear-gradient(to top, #D46675 0%, #A83E4E 100%)',
+                  }}
+                />
               </div>
 
               {/* Dynamic Lip Contour Highlight */}
               <div
                 className="absolute inset-0 rounded-full border border-[#B75365]/40 pointer-events-none transition-transform duration-75"
                 style={{
-                  transform: `scale(${0.9 + mouthWide * 0.15}, ${0.8 + mouthOpen * 0.45})`,
+                  transform: `scale(${0.92 + finalMouthWide * 0.15}, ${0.8 + finalMouthOpen * 0.45})`,
                 }}
               />
             </div>
@@ -258,18 +319,18 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
         </span>
       </div>
 
-      {/* Bottom Center: Conversational State & Sound Waves */}
+      {/* Bottom Center: Conversational State & Audio Wave Intensity */}
       {showStatusBadge && (
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-4 py-2 rounded-2xl bg-black/70 backdrop-blur-xl border border-white/20 shadow-2xl">
           {/* Status Label */}
           <div className="flex items-center gap-2">
-            {state === 'speaking' || isSpeaking ? (
+            {activeSpeaking ? (
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-3 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
                 <span className="w-1.5 h-5 bg-purple-300 rounded-full animate-bounce [animation-delay:-0.15s]" />
                 <span className="w-1.5 h-3 bg-purple-400 rounded-full animate-bounce" />
               </div>
-            ) : state === 'listening' || isListening ? (
+            ) : isListening || state === 'listening' ? (
               <div className="flex items-center gap-1.5">
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -286,9 +347,9 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
 
             <span className="text-xs font-bold text-white tracking-wide">
               {statusLabel ||
-                (state === 'speaking' || isSpeaking
+                (activeSpeaking
                   ? 'Mentor Speaking...'
-                  : state === 'listening' || isListening
+                  : isListening || state === 'listening'
                   ? 'Listening to Candidate...'
                   : state === 'thinking'
                   ? 'Analyzing STAR Rigor...'
@@ -296,19 +357,21 @@ export const PhotoRealisticMentorAvatar: React.FC<PhotoRealisticMentorAvatarProp
             </span>
           </div>
 
-          {/* Sound Wave Frequency Bars (Connected to Speech Audio) */}
-          {(isSpeaking || isListening) && (
+          {/* Real-Time Audio Frequency Bars (Driven by Web Audio Analyser Node) */}
+          {(activeSpeaking || isListening) && (
             <div className="flex items-center gap-0.5 pl-2 border-l border-white/20">
               {[45, 80, 60, 95, 65, 40].map((h, i) => (
                 <div
                   key={i}
                   className={`w-0.5 rounded-full transition-all duration-75 ${
-                    isSpeaking ? 'bg-purple-300' : 'bg-emerald-300'
+                    activeSpeaking ? 'bg-purple-300' : 'bg-emerald-300'
                   }`}
                   style={{
                     height: `${Math.max(
                       3,
-                      (isSpeaking ? Math.max(0.4, mouthOpen) * 18 : audioLevel * 18 || 7) *
+                      (activeSpeaking
+                        ? Math.max(0.4, isAudioPlaying ? reactiveVolume * 1.5 : finalMouthOpen) * 18
+                        : audioLevel * 18 || 7) *
                         (h / 100)
                     )}px`,
                   }}

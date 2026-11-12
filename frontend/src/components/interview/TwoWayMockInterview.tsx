@@ -75,6 +75,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const studentVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const aiAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // 2. Interview Questions Configuration
   const [questions] = useState<InterviewQuestionItem[]>(() => {
@@ -273,15 +274,10 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
   }, [isSpeaking, mentorState, resetTranscript, startListening]);
 
   /**
-   * Speak Interviewer Question with Synchronized Audio-Driven Lip Movements & 100% Female Voice
+   * Fallback to SpeechSynthesis if Network / Audio Element Fails
    */
-  const askQuestionAloud = useCallback(
+  const playSpeechSynthesisFallback = useCallback(
     (questionText: string) => {
-      cancelSpeech();
-      stopListening();
-      setMentorState('speaking');
-      lipSyncControllerRef.current.setSpeaking(true, questionText.split(' ')[0]);
-
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         try {
           window.speechSynthesis.cancel();
@@ -289,15 +285,11 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         } catch {}
       }
 
-      // Always resolve verified articulate female voice
       const targetVoice = getFemaleMentorVoice(voices);
-
       const utterance = new SpeechSynthesisUtterance(questionText);
-      utterance.pitch = 1.15; // Unmistakably bright, warm, articulate female pitch
-      utterance.rate = 0.98; // Natural, conversational speed
-      if (targetVoice) {
-        utterance.voice = targetVoice;
-      }
+      utterance.pitch = 1.15;
+      utterance.rate = 0.98;
+      if (targetVoice) utterance.voice = targetVoice;
 
       utterance.onstart = () => {
         setMentorState('speaking');
@@ -318,10 +310,7 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         startListening();
       };
 
-      utterance.onerror = (e) => {
-        if (e.error !== 'canceled') {
-          console.warn('SpeechSynthesis warning:', e);
-        }
+      utterance.onerror = () => {
         lipSyncControllerRef.current.setSpeaking(false);
         setMentorState('listening');
         startListening();
@@ -335,7 +324,50 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
         startListening();
       }
     },
-    [cancelSpeech, stopListening, voices, resetTranscript, startListening]
+    [voices, resetTranscript, startListening]
+  );
+
+  /**
+   * Speak Interviewer Question through HTML5 <audio> & Web Audio API AnalyserNode
+   */
+  const askQuestionAloud = useCallback(
+    async (questionText: string) => {
+      cancelSpeech();
+      stopListening();
+      setMentorState('speaking');
+      lipSyncControllerRef.current.setSpeaking(true, questionText.split(' ')[0]);
+
+      // 1. Play through HTML5 <audio> connected to Web Audio AnalyserNode
+      if (aiAudioRef.current) {
+        try {
+          const audio = aiAudioRef.current;
+          audio.pause();
+          audio.currentTime = 0;
+          audio.src = `/api/voice/tts?text=${encodeURIComponent(questionText)}&lang=en-IN`;
+
+          audio.onended = () => {
+            lipSyncControllerRef.current.setSpeaking(false);
+            setMentorState('listening');
+            resetTranscript();
+            startListening();
+          };
+
+          audio.onerror = () => {
+            console.warn('Audio element error, falling back to speech synthesis');
+            playSpeechSynthesisFallback(questionText);
+          };
+
+          await audio.play();
+          return;
+        } catch (err) {
+          console.warn('Audio play interrupted, falling back to speech synthesis:', err);
+        }
+      }
+
+      // 2. Fallback to Web Speech API
+      playSpeechSynthesisFallback(questionText);
+    },
+    [cancelSpeech, stopListening, playSpeechSynthesisFallback, resetTranscript, startListening]
   );
 
   const startInterviewCall = useCallback(() => {
@@ -611,13 +643,15 @@ export const TwoWayMockInterview: React.FC<TwoWayMockInterviewProps> = ({
       <div className="flex-1 p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
         {/* TILE 1: FEMALE AI MENTOR (Prominent Visual with Lip-Sync & Eye Contact) */}
         <div className="lg:col-span-7 rounded-3xl border border-white/15 bg-gradient-to-b from-[#211B38] to-[#141024] p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden shadow-xl min-h-[360px] sm:min-h-[420px]">
-          {/* Main Visual: Realistic Female AI Mentor */}
+          {/* Main Visual: Realistic Female AI Mentor with Web Audio Reactive Lip-Sync */}
           <div className="relative w-full h-full min-h-[300px] sm:min-h-[360px] rounded-2xl overflow-hidden shadow-inner">
+            <audio ref={aiAudioRef} crossOrigin="anonymous" playsInline className="hidden" />
             <PhotoRealisticMentorAvatar
               state={mentorState}
               mouthTarget={currentMouthTarget}
               isSpeaking={isSpeaking}
               isListening={isListening}
+              audioElementRef={aiAudioRef}
               className="w-full h-full rounded-2xl"
             />
           </div>
