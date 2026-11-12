@@ -76,12 +76,34 @@ def health_check():
     }
 
 
-@app.get("/", tags=["Root"])
-def root():
-    return {
-        "message": "Welcome to YapWise AI API - Intelligent Speech, Voice Interview & Communication Platform",
-        "documentation": f"{settings.API_V1_STR}/docs",
-    }
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.isdir(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi.json") or full_path.startswith("redoc"):
+            return JSONResponse(status_code=404, content={"detail": f"Not Found: /{full_path}"})
+        target_file = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.isfile(target_file):
+            return FileResponse(target_file)
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})
+else:
+    @app.get("/", tags=["Root"])
+    def root():
+        return {
+            "message": "Welcome to YapWise AI API - Intelligent Speech, Voice Interview & Communication Platform",
+            "documentation": f"{settings.API_V1_STR}/docs",
+        }
 
 
 if __name__ == "__main__":
